@@ -3,18 +3,20 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTextEdit, QSlider, QLabel, QSizePolicy, QScrollArea
 )
-from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtCore import Qt, QPointF, QDateTime, QTimer
 from PyQt6.QtGui import QPainter, QPen, QColor
-
 import re
 import subprocess
 
 
 CUSTOM_R_CODE = """
+print_comma_separated <- function(x) {
+  cat(paste(x, collapse = ","), "\n")
+}
 plot_func <- function(func, xs) {
     ys <- sapply(xs, function(x) func(x))
-    print(xs)
-    print(ys)
+    print_comma_separated(xs)
+    print_comma_separated(ys)
 }
 """
 
@@ -117,9 +119,9 @@ class MainWindow(QMainWindow):
         self.command_textbox.setPlaceholderText("Enter code here...\n#slider(min,max,[step],[default])\nExample: x <- slider(0,100,10,50)\n")
         self.command_textbox.setText(
 """
-x <- slider(0,100,1,50)
-fn <- function(a) a + x
-xs <- c(50,43,63)
+x <- slider(0,4,1,0)
+fn <- function(a) sin(a) + x
+xs <- seq(1,500)
 plot_func(fn, xs)
 """)
         self.command_textbox.textChanged.connect(self.update_sliders)
@@ -141,6 +143,12 @@ plot_func(fn, xs)
 
         self.slider_containers = []
         self.current_slider_params = []
+
+        self.update_cooldown_timer = QTimer()
+        self.update_cooldown_timer.setSingleShot(True)
+        self.update_cooldown_timer.timeout.connect(self.cooldown_timeout)
+        self.last_graph_update = QDateTime.currentDateTime().toMSecsSinceEpoch()
+        self.pending_graph_update = False
 
     def update_sliders(self):
         commands = self.command_textbox.toPlainText().strip().split("\n")
@@ -196,7 +204,26 @@ plot_func(fn, xs)
 
         self.update_graph()
 
+    def cooldown_timeout(self):
+        if self.pending_graph_update:
+            self.pending_graph_update = False
+            self.process_graph_update()
+
     def update_graph(self):
+        current_time = QDateTime.currentDateTime().toMSecsSinceEpoch()
+        time_since_last = current_time - self.last_graph_update
+
+        if time_since_last >= 1000:  # 1000 ms = 1 second
+            self.update_cooldown_timer.start(1000)
+            self.last_graph_update = current_time
+            self.pending_graph_update = False
+            self.process_graph_update()
+        else:
+            self.pending_graph_update = True
+            remaining_time = 1000 - time_since_last
+            self.update_cooldown_timer.start(remaining_time)
+
+    def process_graph_update(self):
         slider_values = []
         for container in self.slider_containers:
             if slider := container.findChild(StepSlider):
@@ -225,13 +252,10 @@ plot_func(fn, xs)
             return
 
         try:
-            lines = process.stdout.strip().split('\n')
+            lines = process.stdout.split('\n')
 
-            xs = [float(v) for v in lines[0][4:].split(' ')]
-            ys = [float(v) for v in lines[1][4:].split(' ')]
-            
-            print(xs)
-            print(ys)
+            xs = [float(v) for v in lines[0].split(',')]
+            ys = [float(v) for v in lines[1].split(',')]
 
             self.graph_widget.set_points(ys)
         except:
