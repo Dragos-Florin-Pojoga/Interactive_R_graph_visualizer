@@ -1,9 +1,10 @@
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTextEdit, QSlider, QLabel, QSizePolicy
+    QTextEdit, QSlider, QLabel, QSizePolicy, QScrollArea
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtGui import QPainter, QPen, QColor
 
 import re
 
@@ -24,7 +25,6 @@ def snap(min, max, step, val):
     stepped = min + steps * step
 
     return clamp(min, max, stepped)
-
 
 class StepSlider(QSlider):
     def __init__(self, min_val, max_val, step, value_label, *args, **kwargs):
@@ -49,6 +49,42 @@ class StepSlider(QSlider):
             self._value_label.setText(str(snapped))
         super().sliderChange(change)
 
+class GraphWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.points = []
+
+    def set_points(self, points):
+        self.points = points.copy()
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Draw axes with 10% margins
+        margin = int(min(self.width(), self.height()) * 0.1)
+        pen = QPen(QColor(0, 0, 0), 2)
+        painter.setPen(pen)
+        painter.drawLine(margin, self.height()-margin, 
+                        self.width()-margin, self.height()-margin)
+        painter.drawLine(margin, margin, margin, self.height()-margin)
+
+        # Draw graph
+        if self.points:
+            pen = QPen(QColor(0, 0, 255), 3)
+            painter.setPen(pen)
+            x_step = (self.width() - 2*margin) / max(1, (len(self.points)-1))
+            y_max = max(self.points or [1])
+            
+            for i in range(1, len(self.points)):
+                x1 = margin + (i-1)*x_step
+                y1 = self.height() - margin - (self.points[i-1]/y_max)*(self.height()-2*margin)
+                x2 = margin + i*x_step
+                y2 = self.height() - margin - (self.points[i]/y_max)*(self.height()-2*margin)
+                painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -72,15 +108,18 @@ class MainWindow(QMainWindow):
         self.command_textbox.textChanged.connect(self.update_sliders)
         left_layout.addWidget(self.command_textbox, stretch=1)
 
-        # Graph area placeholder (50% height)
-        self.graph_widget = QTextEdit()
+        # Graph area (50% height)
+        self.graph_widget = GraphWidget()
         left_layout.addWidget(self.graph_widget, stretch=1)
 
-        # Right panel
-        self.right_widget = QWidget()
-        self.right_layout = QVBoxLayout(self.right_widget)
-        self.main_layout.addWidget(self.right_widget, stretch=2)
-        self.right_widget.setMinimumWidth(300)
+        # Right panel with scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_content = QWidget()
+        self.right_layout = QVBoxLayout(scroll_content)
+        scroll_area.setWidget(scroll_content)
+        self.main_layout.addWidget(scroll_area, stretch=2)
+        scroll_content.setMinimumWidth(300)
         self.slider_containers = []
 
     def update_sliders(self):
@@ -148,6 +187,8 @@ class MainWindow(QMainWindow):
         result = pattern.sub(replace_match, code)
 
         print(result)
+
+        self.graph_widget.set_points([1,3,2,3,1,0])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
