@@ -1,22 +1,49 @@
 import subprocess
-
-def param(start, end, step):
-    return [round(x, 10) for x in frange(start, end, step)]
+import re
 
 def frange(start, stop, step):
     while start <= stop:
         yield start
         start += step
 
-def execute_r_script(r_snippet, **params):
-    for key, value in params.items():
-        r_array = "c(" + ", ".join(map(str, value)) + ")"
-        r_snippet = r_snippet.replace(f"{key} <- param", f"{key} <- {r_array}")
+def parse_and_replace(line):
+    match = re.match(r"(\w+)\s*<-\s*param\(([^)]+)\)", line)
+    if not match:
+        raise ValueError(f"Line does not match expected format: {line}")
 
-    print(r_snippet)
+    variable_name = match.group(1)
+    args = match.group(2).split(",")
+    start, end, step = map(float, args)
+
+    sequence = [round(x, 10) for x in frange(start, end, step)]
+
+    r_sequence = "c(" + ", ".join(map(str, sequence)) + ")"
+    new_line = f"{variable_name} <- {r_sequence}"
+    return new_line
+
+def preprocess_r_script(r_script, **params):
+    lines = r_script.split("\n")
+    updated_lines = []
+    for line in lines:
+        if "param(" in line:
+            updated_lines.append(parse_and_replace(line))
+        else:
+            updated_lines.append(line)
+    return "\n".join(updated_lines)
+
+if __name__ == "__main__":
+    r_script = """
+x <- param(1, 10, 0.1)
+y <- param(1, 10, 0.2)
+results <- sin(x * y)
+cat(results, sep="\n")
+"""
+
+    updated_script = preprocess_r_script(r_script)
+    print(updated_script)
 
     process = subprocess.run(
-        ["Rscript", "-e", r_snippet],
+        ["Rscript", "-e", updated_script],
         capture_output=True,
         text=True,
     )
@@ -24,18 +51,5 @@ def execute_r_script(r_snippet, **params):
     if process.returncode != 0:
         raise RuntimeError(f"R script failed: {process.stderr}")
 
-    return process.stdout.strip()
-
-if __name__ == "__main__":
-    r_code = """
-    x <- param
-    y <- param
-    results <- sin(x * y)
-    cat(results)
-    """
-
-    x_values = param(1, 10, 0.1)
-    y_values = param(1, 10, 0.2)
-
-    result = execute_r_script(r_code, x=x_values, y=y_values)
-    print(result)
+    results = [float(r) for r in process.stdout.strip().split('\n')]
+    print(results)
