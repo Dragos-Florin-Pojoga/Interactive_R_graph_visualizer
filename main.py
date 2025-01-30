@@ -1,52 +1,47 @@
 import tkinter as tk
-from tkinter import Scale
-import threading
+from tkinter import messagebox
+import rpy2.robjects as ro
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
 
-slider_value = 0
-debounce_timer = None
+def run_r_code():
+    try:
+        r_code = r_code_input.get("1.0", tk.END)
+        ro.r(r_code)
 
-def on_slider_change(val):
-    global slider_value, debounce_timer
-
-    if debounce_timer is not None:
-        debounce_timer.cancel()
-
-    debounce_timer = threading.Timer(0.1, update_value, args=(val,))
-    debounce_timer.start()
-
-def update_value(val):
-    global slider_value
-    slider_value = val
-    print(f"Updated slider value: {slider_value}")
+        if "plot" in ro.globalenv:
+            plot_data = ro.globalenv["plot"]
+            ax.clear()
+            ax.plot(np.array(plot_data), 'b-')
+            canvas.draw()
+        else:
+            messagebox.showwarning("No Plot", "R code did not generate a plot.")
+        
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
 root = tk.Tk()
-root.title("Interactive Sliders")
+root.title("R Code Executor and Plotter")
 
-slider = Scale(
-    root,
-    from_=0,
-    to=100,
-    resolution=0.1,
-    orient='horizontal',
-    command=on_slider_change
-)
-slider.pack()
+frame = tk.Frame(root)
+frame.pack(fill=tk.BOTH, expand=True)
 
-def draw_graph(data):
-    canvas = tk.Canvas(root, width=500, height=400)
-    canvas.pack()
-    margin = 50
-    max_value = max(data) if data else 1
+r_code_input_label = tk.Label(frame, text="Enter R Code:")
+r_code_input_label.pack(pady=10)
+r_code_input = tk.Text(frame, height=10, width=40)
+r_code_input.pack(pady=5)
 
-    scaled_data = [ (
-            i * (400 - 2 * margin) / (len(data) - 1) + margin,
-            400 - margin - (value * (400 - 2 * margin) / max_value)
-        ) for i, value in enumerate(data) 
-    ]
+slider_label = tk.Label(frame, text="Adjust Value:")
+slider_label.pack(pady=5)
+slider = tk.Scale(frame, from_=0, to=10, orient=tk.HORIZONTAL)
+slider.pack(pady=5)
 
-    for x, y in scaled_data:
-        canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill="red")
+run_button = tk.Button(frame, text="Run R Code", command=run_r_code)
+run_button.pack(pady=10)
 
-data = [1,4,3,2]
-draw_graph(data)
+fig, ax = plt.subplots(figsize=(6, 4))
+canvas = FigureCanvasTkAgg(fig, master=frame)
+canvas.get_tk_widget().pack(pady=10)
+
 root.mainloop()
