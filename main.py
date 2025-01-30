@@ -7,6 +7,17 @@ from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QPainter, QPen, QColor
 
 import re
+import subprocess
+
+
+CUSTOM_R_CODE = """
+plot_func <- function(func, xs) {
+    ys <- sapply(xs, function(x) func(x))
+    print(xs)
+    print(ys)
+}
+"""
+
 
 def clamp(min, max, val):
     if val < min:
@@ -104,7 +115,13 @@ class MainWindow(QMainWindow):
         # Command textbox (50% height)
         self.command_textbox = QTextEdit()
         self.command_textbox.setPlaceholderText("Enter code here...\n#slider(min,max,[step],[default])\nExample: x <- slider(0,100,10,50)\n")
-        self.command_textbox.setText("x <- slider(0,100,10,50)\n")
+        self.command_textbox.setText(
+"""
+x <- slider(0,100,1,50)
+fn <- function(a) a + x
+xs <- c(50,43,63)
+plot_func(fn, xs)
+""")
         self.command_textbox.textChanged.connect(self.update_sliders)
         left_layout.addWidget(self.command_textbox, stretch=1)
 
@@ -112,58 +129,70 @@ class MainWindow(QMainWindow):
         self.graph_widget = GraphWidget()
         left_layout.addWidget(self.graph_widget, stretch=1)
 
-        # Right panel with scroll area
+        # Right panel with scroll
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_content = QWidget()
+        scroll_content.setMinimumWidth(300)
         self.right_layout = QVBoxLayout(scroll_content)
         scroll_area.setWidget(scroll_content)
         self.main_layout.addWidget(scroll_area, stretch=2)
-        scroll_content.setMinimumWidth(300)
+
+
         self.slider_containers = []
+        self.current_slider_params = []
 
     def update_sliders(self):
+        commands = self.command_textbox.toPlainText().strip().split("\n")
+        new_slider_params = []
+        for cmd in commands:
+            match = re.search(r'slider\(([^)]+)\)', cmd)
+            if match:
+                parts = [p.strip() for p in match.group(1).split(',')]
+                try:
+                    min_val = int(parts[0])
+                    max_val = int(parts[1])
+                    step_val = int(parts[2]) if len(parts) > 2 else 1
+                    default_val = int(parts[3]) if len(parts) > 3 else min_val
+                    new_slider_params.append((min_val, max_val, step_val, default_val))
+                except Exception as e:
+                    print(f"Invalid slider command: {cmd} ({str(e)})")
+
+        if new_slider_params == self.current_slider_params:
+            self.update_graph()
+            return
+
+        self.current_slider_params = new_slider_params.copy()
+
         for container in self.slider_containers:
             container.deleteLater()
         self.slider_containers.clear()
 
-        commands = self.command_textbox.toPlainText().strip().split("\n")
-        for cmd in commands:
-            match = re.search(r'slider\(([^)]+)\)', cmd)
-            if match:
-                try:
-                    parts = match.group(1).split(',')
-                    min_val = int(parts[0].strip())
-                    max_val = int(parts[1].strip())
-                    step_val = int(parts[2].strip()) if len(parts) > 2 else 1
-                    default_val = int(parts[3].strip()) if len(parts) > 3 else min_val
+        for params in new_slider_params:
+            min_val, max_val, step_val, default_val = params
+            container = QWidget()
+            container.setContentsMargins(5, 5, 5, 5)
+            layout = QHBoxLayout(container)
+            
+            info_label = QLabel(f"{min_val}-{max_val}\nStep: {step_val}")
+            info_label.setFixedWidth(100)
 
-                    container = QWidget()
-                    container.setContentsMargins(5, 5, 5, 5)
-                    layout = QHBoxLayout(container)
-                    
-                    info_label = QLabel(f"{min_val}-{max_val}\nStep: {step_val}")
-                    info_label.setFixedWidth(100)
-
-                    value_label = QLabel(str(default_val))
-                    value_label.setFixedWidth(60)
-                    value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                    
-                    slider = StepSlider(min_val, max_val, step_val, value_label, Qt.Orientation.Horizontal)
-                    slider.setValue(default_val)
-                    slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-                    
-                    slider.valueChanged.connect(self.update_graph)
-                    
-                    layout.addWidget(info_label)
-                    layout.addWidget(slider)
-                    layout.addWidget(value_label)
-                    
-                    self.right_layout.addWidget(container)
-                    self.slider_containers.append(container)
-
-                except Exception as e:
-                    print(f"Invalid command: {cmd} ({str(e)})")
+            value_label = QLabel(str(default_val))
+            value_label.setFixedWidth(60)
+            value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            
+            slider = StepSlider(min_val, max_val, step_val, value_label, Qt.Orientation.Horizontal)
+            slider.setValue(default_val)
+            slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            
+            slider.valueChanged.connect(self.update_graph)
+            
+            layout.addWidget(info_label)
+            layout.addWidget(slider)
+            layout.addWidget(value_label)
+            
+            self.right_layout.addWidget(container)
+            self.slider_containers.append(container)
 
         self.update_graph()
 
@@ -184,14 +213,33 @@ class MainWindow(QMainWindow):
                 return str(slider_values[index - 1])
             else:
                 return match.group()
-        result = pattern.sub(replace_match, code)
+        script = CUSTOM_R_CODE + pattern.sub(replace_match, code)
 
-        print(result)
+        process = subprocess.run(
+            ["Rscript", "-e", script],
+            capture_output=True,
+            text=True,
+        )
 
-        self.graph_widget.set_points([1,3,2,3,1,0])
+        if process.returncode != 0:
+            return
+
+        try:
+            lines = process.stdout.strip().split('\n')
+
+            xs = [float(v) for v in lines[0][4:].split(' ')]
+            ys = [float(v) for v in lines[1][4:].split(' ')]
+            
+            print(xs)
+            print(ys)
+
+            self.graph_widget.set_points(ys)
+        except:
+            return
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
