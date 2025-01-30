@@ -245,9 +245,64 @@ class GraphWidget(QWidget):
         self.draw_dynamic_axes(painter, margin, available_width, available_height, y_axis_x, x_axis_y)
         self.draw_dynamic_ticks(painter, margin, available_width, available_height,
                                x_padded_min, x_padded_max, y_padded_min, y_padded_max,
-                               x_scale, y_scale)
+                               x_scale, y_scale, y_axis_x, x_axis_y)
         self.draw_dynamic_points(painter, margin, available_width, available_height,
                                 x_padded_min, y_padded_min, x_scale, y_scale)
+
+    def draw_dynamic_ticks(self, painter, margin, available_width, available_height,
+                          x_padded_min, x_padded_max, y_padded_min, y_padded_max,
+                          x_scale, y_scale, y_axis_x, x_axis_y):
+        tick_length = 5
+        metrics = painter.fontMetrics()
+
+        # X-axis ticks
+        x_ticks = self.calculate_dynamic_ticks(x_padded_min, x_padded_max)
+        for tick in x_ticks:
+            x_pos = margin + (tick - x_padded_min) * x_scale
+            # Determine tick direction and label placement
+            if x_axis_y == margin + available_height:  # Bottom edge
+                tick_start = x_axis_y - tick_length
+                tick_end = x_axis_y
+                label_y = x_axis_y - tick_length - 5  # Above the tick
+            elif x_axis_y == margin:  # Top edge
+                tick_start = x_axis_y
+                tick_end = x_axis_y + tick_length
+                label_y = x_axis_y + tick_length + metrics.height() + 5  # Below the tick
+            else:  # Middle
+                tick_start = x_axis_y - tick_length // 2
+                tick_end = x_axis_y + tick_length // 2
+                label_y = x_axis_y + tick_length // 2 + metrics.height() + 5  # Below the tick
+
+            painter.drawLine(int(x_pos), int(tick_start), int(x_pos), int(tick_end))
+            lbl = self.format_label(tick)
+            rect = metrics.boundingRect(lbl)
+            painter.drawText(int(x_pos - rect.width() // 2), int(label_y), lbl)
+
+        # Y-axis ticks
+        y_ticks = self.calculate_dynamic_ticks(y_padded_min, y_padded_max)
+        for tick in y_ticks:
+            y_pos = margin + available_height - (tick - y_padded_min) * y_scale
+            # Determine tick direction and label placement
+            if y_axis_x == margin:  # Left edge
+                tick_start = y_axis_x
+                tick_end = y_axis_x + tick_length
+                label_x = y_axis_x + tick_length + 5  # Right of the tick
+            elif y_axis_x == margin + available_width:  # Right edge
+                tick_start = y_axis_x - tick_length
+                tick_end = y_axis_x
+                label_x = y_axis_x - tick_length - 5  # Left of the tick
+            else:  # Middle
+                tick_start = y_axis_x - tick_length // 2
+                tick_end = y_axis_x + tick_length // 2
+                label_x = y_axis_x + tick_length // 2 + 5  # Right of the tick
+
+            painter.drawLine(int(tick_start), int(y_pos), int(tick_end), int(y_pos))
+            lbl = self.format_label(tick)
+            rect = metrics.boundingRect(lbl)
+            if y_axis_x == margin + available_width:  # Adjust for right edge
+                painter.drawText(int(label_x - rect.width()), int(y_pos + rect.height() // 4), lbl)
+            else:
+                painter.drawText(int(label_x), int(y_pos + rect.height() // 4), lbl)
 
     def calculate_padded_range(self, mi, mx):
         if mi == mx:
@@ -304,21 +359,6 @@ class GraphWidget(QWidget):
             painter.drawLine(int(path[i-1].x()), int(path[i-1].y()),
                             int(path[i].x()), int(path[i].y()))
 
-
-    def draw_dynamic_ticks(self, painter, margin, available_width, available_height,
-                          x_padded_min, x_padded_max, y_padded_min, y_padded_max,
-                          x_scale, y_scale):
-        # X-axis ticks
-        x_ticks = self.calculate_dynamic_ticks(x_padded_min, x_padded_max)
-        for tick in x_ticks:
-            x_pos = margin + (tick - x_padded_min) * x_scale
-            self.draw_tick(painter, x_pos, margin + available_height, horizontal=True, label=tick)
-
-        # Y-axis ticks
-        y_ticks = self.calculate_dynamic_ticks(y_padded_min, y_padded_max)
-        for tick in y_ticks:
-            y_pos = margin + available_height - (tick - y_padded_min) * y_scale
-            self.draw_tick(painter, margin, y_pos, horizontal=False, label=tick)
 
     def calculate_dynamic_ticks(self, mi, mx):
         if mi >= mx:
