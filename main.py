@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTextEdit, QSlider, QLabel, QSizePolicy, QScrollArea
+    QTextEdit, QSlider, QLabel, QSizePolicy, QScrollArea, QPushButton
 )
 from PyQt6.QtCore import Qt, QPointF, QDateTime, QTimer
 from PyQt6.QtGui import QPainter, QPen, QColor
@@ -170,24 +170,34 @@ class StepSlider(QSlider):
 
 
 
-
+import numpy as np
 
 class GraphWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.points = []
+        self.centered_mode = True  # Default mode
+        # Centered mode parameters
         self.x_abs_max = 1
         self.y_abs_max = 1
+        # Dynamic mode parameters
+        self.xmi, self.xmx = 0, 0
+        self.ymi, self.ymx = 0, 0
 
-    def set_data(self, xs, ys, xmi, xmx, ymi, ymx):
+    def toggle_drawing_mode(self):
+        self.centered_mode = not self.centered_mode
+        self.update()
+
+    def set_data(self, xs, ys, xmx, xmi, ymx, ymi):
         self.points = list(zip(xs, ys)) if (xs and ys) else []
+        self.xmi, self.xmx = xmi, xmx
+        self.ymi, self.ymx = ymi, ymx
         
-        # Calculate x_abs_max with 10% padding
+        # Calculate parameters for both modes
+        # Centered mode
         x_abs_max_candidate = max(abs(xmi), abs(xmx)) * 1.1
         self.x_abs_max = x_abs_max_candidate if x_abs_max_candidate != 0 else 1
-        
-        # Calculate y_abs_max with 10% padding
         y_abs_max_candidate = max(abs(ymi), abs(ymx)) * 1.1
         self.y_abs_max = y_abs_max_candidate if y_abs_max_candidate != 0 else 1
         
@@ -196,52 +206,195 @@ class GraphWidget(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Calculate dimensions
         margin = int(min(self.width(), self.height()) * 0.1)
-        center_x = self.width() / 2
-        center_y = self.height() / 2
         available_width = self.width() - 2 * margin
         available_height = self.height() - 2 * margin
 
-        # Calculate scaling factors
+        if self.centered_mode:
+            self.draw_centered_mode(painter, margin, available_width, available_height)
+        else:
+            self.draw_dynamic_mode(painter, margin, available_width, available_height)
+
+    def draw_centered_mode(self, painter, margin, available_width, available_height):
+        center_x = self.width() / 2
+        center_y = self.height() / 2
         x_scale = available_width / (2 * self.x_abs_max) if self.x_abs_max != 0 else 1
         y_scale = available_height / (2 * self.y_abs_max) if self.y_abs_max != 0 else 1
 
-        # Draw axes
         self.draw_axes(painter, center_x, center_y, margin)
-        
-        # Draw ticks
-        self.draw_ticks(painter, center_x, center_y, x_scale, y_scale)
+        self.draw_centered_ticks(painter, center_x, center_y, x_scale, y_scale)  # Fixed call
+        self.draw_points(painter, center_x, center_y, x_scale, y_scale)
 
-        # Draw graph
-        if self.points:
-            pen = QPen(QColor(0, 0, 255), 3)
-            painter.setPen(pen)
-            
-            path = []
-            for x, y in self.points:
-                px = int(center_x + x * x_scale)
-                py = int(center_y - y * y_scale)  # Flip Y coordinate
-                path.append(QPointF(px, py))
-            
-            for i in range(1, len(path)):
-                painter.drawLine(int(path[i-1].x()), int(path[i-1].y()),
-                                int(path[i].x()), int(path[i].y()))
+    def draw_dynamic_mode(self, painter, margin, available_width, available_height):
+        if not self.points:
+            return
+
+        # Calculate dynamic ranges with padding
+        x_padded_min, x_padded_max = self.calculate_padded_range(self.xmi, self.xmx)
+        y_padded_min, y_padded_max = self.calculate_padded_range(self.ymi, self.ymx)
+
+        # Calculate scaling factors
+        x_scale = available_width / (x_padded_max - x_padded_min) if (x_padded_max - x_padded_min) != 0 else 1
+        y_scale = available_height / (y_padded_max - y_padded_min) if (y_padded_max - y_padded_min) != 0 else 1
+
+        # Calculate axis positions
+        y_axis_x = self.calculate_axis_position(x_padded_min, x_padded_max, margin, available_width, x_scale)
+        x_axis_y = self.calculate_axis_position(y_padded_min, y_padded_max, margin, available_height, y_scale, is_y=True)
+
+        # Draw dynamic elements
+        self.draw_dynamic_axes(painter, margin, available_width, available_height, y_axis_x, x_axis_y)
+        self.draw_dynamic_ticks(painter, margin, available_width, available_height,
+                               x_padded_min, x_padded_max, y_padded_min, y_padded_max,
+                               x_scale, y_scale)
+        self.draw_dynamic_points(painter, margin, available_width, available_height,
+                                x_padded_min, y_padded_min, x_scale, y_scale)
+
+    def calculate_padded_range(self, mi, mx):
+        if mi == mx:
+            padding = max(abs(mi), 1) * 0.1
+            return mi - padding, mx + padding
+        padding = (mx - mi) * 0.1
+        return mi - padding, mx + padding
+
+    def calculate_axis_position(self, mi, mx, margin, available_size, scale, is_y=False):
+        if mi <= 0 <= mx:
+            pos = margin + (0 - mi) * scale
+        else:
+            pos = margin if 0 < mi else margin + available_size
+        if is_y:
+            pos = margin + available_size - (pos - margin)
+        return pos
 
     def draw_axes(self, painter, center_x, center_y, margin):
         pen = QPen(QColor(0, 0, 0), 2)
         painter.setPen(pen)
-        # X-axis
         painter.drawLine(margin, int(center_y), self.width() - margin, int(center_y))
-        # Y-axis
         painter.drawLine(int(center_x), margin, int(center_x), self.height() - margin)
 
+    def draw_dynamic_axes(self, painter, margin, available_width, available_height, y_axis_x, x_axis_y):
+        pen = QPen(QColor(0, 0, 0), 2)
+        painter.setPen(pen)
+        painter.drawLine(int(y_axis_x), margin, int(y_axis_x), margin + available_height)
+        painter.drawLine(margin, int(x_axis_y), margin + available_width, int(x_axis_y))
+
+    def draw_points(self, painter, center_x, center_y, x_scale, y_scale):
+        if not self.points:
+            return
+        pen = QPen(QColor(0, 0, 255), 3)
+        painter.setPen(pen)
+        path = []
+        for x, y in self.points:
+            px = int(center_x + x * x_scale)
+            py = int(center_y - y * y_scale)
+            path.append(QPointF(px, py))
+        for i in range(1, len(path)):
+            painter.drawLine(int(path[i-1].x()), int(path[i-1].y()),
+                            int(path[i].x()), int(path[i].y()))
+
+    def draw_dynamic_points(self, painter, margin, available_width, available_height,
+                           x_padded_min, y_padded_min, x_scale, y_scale):
+        pen = QPen(QColor(0, 0, 255), 3)
+        painter.setPen(pen)
+        path = []
+        for x, y in self.points:
+            px = margin + (x - x_padded_min) * x_scale
+            py = margin + available_height - (y - y_padded_min) * y_scale
+            path.append(QPointF(px, py))
+        for i in range(1, len(path)):
+            painter.drawLine(int(path[i-1].x()), int(path[i-1].y()),
+                            int(path[i].x()), int(path[i].y()))
+
+
+    def draw_dynamic_ticks(self, painter, margin, available_width, available_height,
+                          x_padded_min, x_padded_max, y_padded_min, y_padded_max,
+                          x_scale, y_scale):
+        # X-axis ticks
+        x_ticks = self.calculate_dynamic_ticks(x_padded_min, x_padded_max)
+        for tick in x_ticks:
+            x_pos = margin + (tick - x_padded_min) * x_scale
+            self.draw_tick(painter, x_pos, margin + available_height, horizontal=True, label=tick)
+
+        # Y-axis ticks
+        y_ticks = self.calculate_dynamic_ticks(y_padded_min, y_padded_max)
+        for tick in y_ticks:
+            y_pos = margin + available_height - (tick - y_padded_min) * y_scale
+            self.draw_tick(painter, margin, y_pos, horizontal=False, label=tick)
+
+    def calculate_dynamic_ticks(self, mi, mx):
+        if mi >= mx:
+            return []
+        range_val = mx - mi
+        step = self.nice_step(range_val / 5)
+        return [t for t in np.arange(mi // step * step, mx + step, step) if mi <= t <= mx]
+
+    def nice_step(self, rough_step):
+        if rough_step <= 0:
+            return 1
+        exponent = math.floor(math.log10(rough_step))
+        factor = 10 ** exponent
+        normalized = rough_step / factor
+        if normalized < 1.5:
+            return 1 * factor
+        elif normalized < 3:
+            return 2 * factor
+        return 5 * factor
+
+    def draw_tick(self, painter, x, y, horizontal=True, label=None):
+        tick_length = 5
+        metrics = painter.fontMetrics()
+        if horizontal:
+            painter.drawLine(int(x), int(y - tick_length), int(x), int(y + tick_length))
+            if label is not None:
+                lbl = self.format_label(label)
+                rect = metrics.boundingRect(lbl)
+                painter.drawText(int(x - rect.width()/2), int(y + 20 + rect.height()), lbl)
+        else:
+            painter.drawLine(int(x - tick_length), int(y), int(x + tick_length), int(y))
+            if label is not None:
+                lbl = self.format_label(label)
+                rect = metrics.boundingRect(lbl)
+                painter.drawText(int(x + 10), int(y + rect.height()//4), lbl)
+
+    def format_label(self, value):
+        if abs(value) < 1e4:
+            return f"{value:.2f}".rstrip('0').rstrip('.')
+        return f"{value:.1e}"
+    
+    def draw_centered_ticks(self, painter, center_x, center_y, x_scale, y_scale):
+        pen = QPen(QColor(0, 0, 0), 1)
+        painter.setPen(pen)
+        metrics = painter.fontMetrics()
+        tick_length = 5
+
+        # X-axis ticks
+        x_ticks = self.calculate_ticks(self.x_abs_max)
+        for tick in x_ticks:
+            x_pos = int(center_x + tick * x_scale)
+            painter.drawLine(x_pos, int(center_y - tick_length), 
+                        x_pos, int(center_y + tick_length))
+            label = self.format_label(tick)
+            rect = metrics.boundingRect(label)
+            painter.drawText(x_pos - rect.width()//2, 
+                        int(center_y + 20 + rect.height()), 
+                        label)
+
+        # Y-axis ticks
+        y_ticks = self.calculate_ticks(self.y_abs_max)
+        for tick in y_ticks:
+            y_pos = int(center_y - tick * y_scale)
+            painter.drawLine(int(center_x - tick_length), y_pos,
+                        int(center_x + tick_length), y_pos)
+            label = self.format_label(tick)
+            rect = metrics.boundingRect(label)
+            painter.drawText(int(center_x + 10), 
+                        y_pos + rect.height()//4, 
+                        label)
+    
     def calculate_ticks(self, max_val):
+        """Centered mode tick calculation (symmetric around zero)"""
         if max_val <= 0:
             return []
         
-        # Calculate nice step size
         rough_step = max_val / 5
         exponent = math.floor(math.log10(rough_step))
         factor = 10 ** exponent
@@ -257,34 +410,10 @@ class GraphWidget(QWidget):
         ticks = []
         current = -max_val
         while current <= max_val:
-            if abs(current) <= max_val * 1.001:  # Account for floating errors
+            if abs(current) <= max_val * 1.001:
                 ticks.append(current)
             current += step
         return ticks
-
-    def draw_ticks(self, painter, center_x, center_y, x_scale, y_scale):
-        pen = QPen(QColor(0, 0, 0), 1)
-        painter.setPen(pen)
-        metrics = painter.fontMetrics()
-        tick_length = 5
-
-        # X-axis ticks
-        x_ticks = self.calculate_ticks(self.x_abs_max)
-        for tick in x_ticks:
-            x_pos = int(center_x + tick * x_scale)
-            painter.drawLine(x_pos, int(center_y - tick_length), x_pos, int(center_y + tick_length))
-            label = f"{tick:.2f}".rstrip('0').rstrip('.') if abs(tick) < 1e4 else f"{tick:.1e}"
-            rect = metrics.boundingRect(label)
-            painter.drawText(x_pos - rect.width()//2, int(center_y + 20 + rect.height()), label)
-
-        # Y-axis ticks
-        y_ticks = self.calculate_ticks(self.y_abs_max)
-        for tick in y_ticks:
-            y_pos = int(center_y - tick * y_scale)
-            painter.drawLine(int(center_x - tick_length), y_pos, int(center_x + tick_length), y_pos)
-            label = f"{tick:.2f}".rstrip('0').rstrip('.') if abs(tick) < 1e4 else f"{tick:.1e}"
-            rect = metrics.boundingRect(label)
-            painter.drawText(int(center_x + 10), y_pos + rect.height()//4, label)
             
 
 
@@ -330,6 +459,10 @@ QTextEdit::placeholder {
         # Graph area (66% height)
         self.graph_widget = GraphWidget()
         left_layout.addWidget(self.graph_widget, stretch=2)
+
+        self.ticks_toggle_button = QPushButton("toggle ticks")
+        self.ticks_toggle_button.clicked.connect(self.graph_widget.toggle_drawing_mode)
+        left_layout.addWidget(self.ticks_toggle_button)
 
         # Right panel with scroll
         scroll_area = QScrollArea()
@@ -444,20 +577,12 @@ if __name__ == "__main__":
 
     window.command_textbox.setText(
 """
-n <- slider(1, 10, 1, 1)
-x <- seq(-5, 10, length.out = 1000)
-
-cdf_X <- function(x) pnorm(x)
-cdf_3minus2X <- function(x) 1 - pnorm((3 - x)/2)
-cdf_X2 <- function(x) pchisq(pmax(x, 0), df = 1)
-cdf_SumXi <- function(x) pnorm(x, 0, sqrt(n))
-cdf_SumXi2 <- function(x) pchisq(pmax(x, 0), df = n)
-
-#plot_func(cdf_X, x)
-#plot_func(cdf_3minus2X, x)
-#plot_func(cdf_X2, x)
-#plot_func(cdf_SumXi, x)
-plot_func(cdf_SumXi2, x)
+a <- slider(0,8,0.01,2.42)
+b <- slider(0,8,0.1,0.5)
+c <- slider(1,30,1,10)
+fn <- function(x) sin(x+a)+b
+xs <- seq(-c,c,0.1)
+plot_func(fn, xs)
 """)
     
     QTimer.singleShot(0, window.update_sliders)
