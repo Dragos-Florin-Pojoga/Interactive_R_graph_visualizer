@@ -7,16 +7,20 @@ from PyQt6.QtCore import Qt, QPointF, QDateTime, QTimer
 from PyQt6.QtGui import QPainter, QPen, QColor
 import re
 import subprocess
+import math
 
 
 CUSTOM_R_CODE = """
 print_comma_separated <- function(x) {
   cat(paste(x, collapse = ","), "\n")
 }
-plot_func <- function(func, xs) {
-    ys <- sapply(xs, function(x) func(x))
+plot_points <- function(xs, ys) {
     print_comma_separated(xs)
     print_comma_separated(ys)
+}
+plot_func <- function(func, xs) {
+    ys <- sapply(xs, function(x) func(x))
+    plot_points(xs, ys)
 }
 """
 
@@ -42,25 +46,49 @@ def snap(min, max, step, val):
 class StepSlider(QSlider):
     def __init__(self, min_val, max_val, step, value_label, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._min_val = min_val
         self._step = step
         self._value_label = value_label
-        self.setRange(min_val, max_val)
+
+        self._number_of_steps = math.floor((max_val - min_val) / step)
+        self._max_val = min_val + self._number_of_steps * step
+
+        super().setRange(0, self._number_of_steps)
+        self.setSingleStep(1)
+        self.setPageStep(1)
+
+    def _scaled_to_value(self, scaled):
+        return self._min_val + scaled * self._step
+
+    def _value_to_scaled(self, value):
+        return round((value - self._min_val) / self._step)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            raw = self.minimum() + event.position().x() / self.width() * (self.maximum() - self.minimum())
-            snapped_value = snap(self.minimum(), self.maximum(), self._step, raw)
-            self.setValue(snapped_value)
+            x_pos = event.position().x()
+            fraction = x_pos / self.width()
+            raw_value = self._min_val + fraction * (self._max_val - self._min_val)
+            snapped_value = self._snap(raw_value)
+            scaled_value = self._value_to_scaled(snapped_value)
+            self.setValue(scaled_value)
         super().mousePressEvent(event)
+
+    def _snap(self, value):
+        steps = round((value - self._min_val) / self._step)
+        snapped = self._min_val + steps * self._step
+        return max(self._min_val, min(self._max_val, snapped))
 
     def sliderChange(self, change):
         if change == QSlider.SliderChange.SliderValueChange:
-            current = self.value()
-            snapped = snap(self.minimum(), self.maximum(), self._step, current)
-            if snapped != current:
-                self.setValue(snapped)
-            self._value_label.setText(str(snapped))
+            scaled_current = self.value()
+            current_value = self._scaled_to_value(scaled_current)
+            snapped_value = self._snap(current_value)
+            scaled_snapped = self._value_to_scaled(snapped_value)
+            if scaled_snapped != scaled_current:
+                self.setValue(scaled_snapped)
+            self._value_label.setText(f"{snapped_value:.2f}")
         super().sliderChange(change)
+
 
 class GraphWidget(QWidget):
     def __init__(self):
@@ -119,9 +147,9 @@ class MainWindow(QMainWindow):
         self.command_textbox.setPlaceholderText("Enter code here...\n#slider(min,max,[step],[default])\nExample: x <- slider(0,100,10,50)\n")
         self.command_textbox.setText(
 """
-x <- slider(0,4,1,0)
-fn <- function(a) sin(a) + x
-xs <- seq(1,500)
+x <- slider(0,4,0.1,2)
+fn <- function(a) sin(a+x)+1
+xs <- seq(1,10,0.1)
 plot_func(fn, xs)
 """)
         self.command_textbox.textChanged.connect(self.update_sliders)
@@ -158,11 +186,10 @@ plot_func(fn, xs)
             if match:
                 parts = [p.strip() for p in match.group(1).split(',')]
                 try:
-                    min_val = int(parts[0])
-                    max_val = int(parts[1])
-                    step_val = int(parts[2]) if len(parts) > 2 else 1
-                    default_val = int(parts[3]) if len(parts) > 3 else min_val
-                    new_slider_params.append((min_val, max_val, step_val, default_val))
+                    min_val = float(parts[0])
+                    max_val = float(parts[1])
+                    step_val = float(parts[2]) if len(parts) > 2 else 1
+                    new_slider_params.append((min_val, max_val, step_val))
                 except Exception as e:
                     print(f"Invalid slider command: {cmd} ({str(e)})")
 
@@ -177,7 +204,7 @@ plot_func(fn, xs)
         self.slider_containers.clear()
 
         for params in new_slider_params:
-            min_val, max_val, step_val, default_val = params
+            min_val, max_val, step_val = params
             container = QWidget()
             container.setContentsMargins(5, 5, 5, 5)
             layout = QHBoxLayout(container)
@@ -185,12 +212,11 @@ plot_func(fn, xs)
             info_label = QLabel(f"{min_val}-{max_val}\nStep: {step_val}")
             info_label.setFixedWidth(100)
 
-            value_label = QLabel(str(default_val))
+            value_label = QLabel()
             value_label.setFixedWidth(60)
             value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             
             slider = StepSlider(min_val, max_val, step_val, value_label, Qt.Orientation.Horizontal)
-            slider.setValue(default_val)
             slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             
             slider.valueChanged.connect(self.update_graph)
@@ -210,18 +236,7 @@ plot_func(fn, xs)
             self.process_graph_update()
 
     def update_graph(self):
-        current_time = QDateTime.currentDateTime().toMSecsSinceEpoch()
-        time_since_last = current_time - self.last_graph_update
-
-        if time_since_last >= 1000:  # 1000 ms = 1 second
-            self.update_cooldown_timer.start(1000)
-            self.last_graph_update = current_time
-            self.pending_graph_update = False
-            self.process_graph_update()
-        else:
-            self.pending_graph_update = True
-            remaining_time = 1000 - time_since_last
-            self.update_cooldown_timer.start(remaining_time)
+        self.process_graph_update()
 
     def process_graph_update(self):
         slider_values = []
