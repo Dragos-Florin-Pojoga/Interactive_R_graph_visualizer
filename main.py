@@ -1,47 +1,50 @@
-import tkinter as tk
-from tkinter import messagebox
-import rpy2.robjects as ro
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QApplication, QWidget, QSlider, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout, QLayout
 
-def run_r_code():
-    try:
-        r_code = r_code_input.get("1.0", tk.END)
-        ro.r(r_code)
+class DynamicSliderWidget(QWidget):
+    def __init__(self):
+        super().__init__()
 
-        if "plot" in ro.globalenv:
-            plot_data = ro.globalenv["plot"]
-            ax.clear()
-            ax.plot(np.array(plot_data), 'b-')
-            canvas.draw()
-        else:
-            messagebox.showwarning("No Plot", "R code did not generate a plot.")
-        
-    except Exception as e:
-        messagebox.showerror("Error", str(e))
+        self.layout = QVBoxLayout()
 
-root = tk.Tk()
-root.title("R Code Executor and Plotter")
+        self.add_slider_button = QPushButton("Add Slider")
+        self.add_slider_button.clicked.connect(self.add_slider)
 
-frame = tk.Frame(root)
-frame.pack(fill=tk.BOTH, expand=True)
+        self.print_values_button = QPushButton("Print All Slider Values")
+        self.print_values_button.clicked.connect(self.print_slider_values)
 
-r_code_input_label = tk.Label(frame, text="Enter R Code:")
-r_code_input_label.pack(pady=10)
-r_code_input = tk.Text(frame, height=10, width=40)
-r_code_input.pack(pady=5)
+        self.layout.addWidget(self.add_slider_button)
+        self.layout.addWidget(self.print_values_button)
 
-slider_label = tk.Label(frame, text="Adjust Value:")
-slider_label.pack(pady=5)
-slider = tk.Scale(frame, from_=0, to=10, orient=tk.HORIZONTAL)
-slider.pack(pady=5)
+        self.sliders = []
 
-run_button = tk.Button(frame, text="Run R Code", command=run_r_code)
-run_button.pack(pady=10)
+        self.setLayout(self.layout)
 
-fig, ax = plt.subplots(figsize=(6, 4))
-canvas = FigureCanvasTkAgg(fig, master=frame)
-canvas.get_tk_widget().pack(pady=10)
+    def add_slider(self):
+        slider_label = QLabel(f"Slider {len(self.sliders) + 1} Value: 0.0")
 
-root.mainloop()
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setMinimum(0)
+        slider.setMaximum(1000)
+        slider.setSingleStep(1)
+        slider.setValue(0)
+
+        slider.valueChanged.connect(lambda value, label=slider_label: self.on_slider_value_changed(value, label))
+
+        self.layout.addWidget(slider_label)
+        self.layout.addWidget(slider)
+
+        self.sliders.append((slider, slider_label))
+
+    def on_slider_value_changed(self, value, label):
+        label.setText(f"Slider Value: {value / 10:.1f}")
+
+    def print_slider_values(self):
+        print("Slider values:")
+        for idx, (slider, label) in enumerate(self.sliders):
+            print(f"Slider {idx + 1}: {slider.value() / 10:.1f}")
+
+app = QApplication([])
+dynamic_slider_widget = DynamicSliderWidget()
+dynamic_slider_widget.show()
+app.exec()
