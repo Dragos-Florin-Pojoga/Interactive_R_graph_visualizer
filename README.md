@@ -26,3 +26,6 @@
     * PyQt6
 * R
 
+
+# Gallery
+![](./assets/reddit.png)

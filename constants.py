@@ -17,6 +17,7 @@ EXAMPLES_LIST = [
     'B_e',
     'B_f',
     'B_g',
+    'reddit',
 ]
 
 PLACEHOLDER_TEXT = """\n\n
@@ -35,6 +36,15 @@ CUSTOM_R_CODE = """
 rm(list=ls())
 print_comma_separated <- function(x) {{
     cat(paste(x, collapse = ","), "\n")
+}}
+plot_point <- function(x, y) {{
+    cat("custom_point_plot\n")
+    print_comma_separated(c(x,y))
+}}
+plot_points <- function(xs, ys) {{
+    for (i in seq_along(xs)) {{
+        plot_point(xs[i], ys[i])
+    }}
 }}
 plot_line <- function(xs, ys, name = "") {{
     cat("custom_line_plot\n")

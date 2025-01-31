@@ -14,6 +14,11 @@ class Widget(QWidget):
         self.y_abs_max = 1
         self.colors = [QColor(0, 0, 255), QColor(255, 0, 0), QColor(0, 255, 0), QColor(255, 165, 0), QColor(128, 0, 128), QColor(0, 255, 255)]
         self.current_color_index = 0
+        self.one_to_one_scaling = False
+
+    def toggle_scaling(self):
+        self.one_to_one_scaling = not self.one_to_one_scaling
+        self.update()
 
 
     def clear(self):
@@ -24,7 +29,7 @@ class Widget(QWidget):
         self.update()
         color_generator.reset()
 
-    def set_data(self, xs, ys, xmi, xmx, ymi, ymx, name):
+    def add_line_data(self, xs, ys, xmi, xmx, ymi, ymx, name):
         points = list(zip(xs, ys)) if (xs and ys) else []
         
         # Calculate max values with padding
@@ -66,6 +71,11 @@ class Widget(QWidget):
         # Calculate scaling factors
         x_scale = available_width / (2 * self.x_abs_max) if self.x_abs_max != 0 else 1
         y_scale = available_height / (2 * self.y_abs_max) if self.y_abs_max != 0 else 1
+
+        if self.one_to_one_scaling:
+            scale = min(x_scale, y_scale)
+            x_scale = scale
+            y_scale = scale
 
         # Draw elements
         self.draw_axes(painter, center_x, center_y, 0)

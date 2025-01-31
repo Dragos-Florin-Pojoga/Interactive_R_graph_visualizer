@@ -95,6 +95,9 @@ class MainWindow(QMainWindow):
         self.graph_widget = graph.Widget()
         left_layout.addWidget(self.graph_widget, stretch=2)
 
+        scale_button = QPushButton("Toggle 1:1 scaling")
+        scale_button.clicked.connect(self.graph_widget.toggle_scaling)
+        left_layout.addWidget(scale_button)
 
 
 
@@ -228,7 +231,7 @@ class MainWindow(QMainWindow):
                     except (IndexError, ValueError) as e:
                         print(f"Parse error: {e}")
                         return
-                    self.graph_widget.set_data(xs,ys,xmi,xmx,ymi,ymx,name)
+                    self.graph_widget.add_line_data(xs,ys,xmi,xmx,ymi,ymx,name)
                 else:
                     R_output += f"{unknown}\n"
             self.R_output_box.setPlainText(R_output)
