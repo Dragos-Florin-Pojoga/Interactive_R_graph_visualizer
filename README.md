@@ -5,7 +5,8 @@
 # Features
 * Support for full R environment
 * Real-Time Graph Plotter
-    * Up to 6 colored graphs on the same plot
+    * as many lines on a single graph as you want
+    * 6 predefined line colors and many randomly generated ones
     * Color legend
     * dynamic graph scaling
 * custom R functions
@@ -24,3 +25,4 @@
 * python3
     * PyQt6
 * R
+
