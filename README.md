@@ -89,6 +89,9 @@ Cerințele suplimentare sunt precizare în mare parte în secțiunile "Cerința 
 Pentru python există librăriile [rpy2](https://rpy2.github.io/) (integrare nativă între R și python) și [Matplotlib](https://matplotlib.org/) (generare avansată de grafice). Integrarea acestor librării într-un pipeline simplu ar rezolva aproape întreaga problemă, singurul aspect ce ar mai trebui abordat ar fi input-ul de la utilizator ce se poate face foarte simplu folosind anumite librării sau ignorarea acestei probleme și rularea aplicației folosind [Jupyter](https://jupyter.org/)
 
 
+# Extra:
+
+`converter.py` este un program separat ce convertește codul R scris pentru aplicația de la `1)` în cod pentru librăria Shiny. Aceste exemple pot fi rulate din environmentul creat de `nix-shell` în acest director folosind comanda `Rscript ./R/Shiny/path.R`
 
 # Galerie
 
