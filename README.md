@@ -37,6 +37,8 @@ Problema se poate împărți în trei subprobleme:
 
 Shiny este o librărie pentru R ce creează aplicații web interactive. Această librărie practic "compilează" codul de R pentru interfață în html, css și js iar codul pentru generarea graficelor este rulat la nevoie pentru a produce imagini ce sunt inserate înapoi în pagină. Acest proces este extrem de complex, ceea ce se reflectă în dimensiunea proiectului: ~115000 de linii de cod scrise de 88 de persoane pe decursul a 13 ani (proiectul a început în 2012)
 
+**Cerința suplimentară:** Construiți o aplicație cu funcționalitățile din Shiny, fără a folosi librăria Shiny
+
 Pentru a crea o aplicație cu o parte din funcționalitatea acestei librării, am ales să folosesc python și cât mai puține librării externe, în final având doar una singura: [PyQt6](https://pypi.org/project/PyQt6/) o librărie cross-platform ce permite crearea de interfețe grafice modulare
 
 Modul de funcționare al acestei aplicații poate fi descris, pe scurt, astfel:
@@ -82,7 +84,7 @@ Deoarece codul a fost scris pentru aplicația de la punctul `1)`, toate rezolvă
 
 Implementarea actuală acoperă toate task-urile propuse în cerința problemei și rezolvă cerințe suplimentare ce nu sunt esențiale pentru rezolvarea problemei inițiale.
 
-Cerințele suplimentare sunt precizare în mare parte în secțiunea "Dificultăți" de la `1)` și evitarea librăriilor specializate deoarece acestea ar face implementarea trivială:
+Cerințele suplimentare sunt precizare în mare parte în secțiunile "Cerința suplimentară" și "Dificultăți" de la `1)` și evitarea librăriilor specializate deoarece acestea ar face implementarea trivială:
 
 Pentru python există librăriile [rpy2](https://rpy2.github.io/) (integrare nativă între R și python) și [Matplotlib](https://matplotlib.org/) (generare avansată de grafice). Integrarea acestor librării într-un pipeline simplu ar rezolva aproape întreaga problemă, singurul aspect ce ar mai trebui abordat ar fi input-ul de la utilizator ce se poate face foarte simplu folosind anumite librării sau ignorarea acestei probleme și rularea aplicației folosind [Jupyter](https://jupyter.org/)
 
