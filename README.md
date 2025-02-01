@@ -3,7 +3,7 @@
 
 # Vizualizator interactiv de grafice generate de R
 
-![](./assets/example_4.png)
+![](./assets/example_4_points.png)
 
 # Funcționalități
 * Suport complet pentru mediul R
@@ -55,4 +55,6 @@ Pentru a crea o aplicație cu o parte din funcționalitatea acestei librării, a
 
 ![](./assets/reddit.png)
 
-![](./assets/example_4.png)
+![](./assets/example_4_points.png)
+
+![](./assets/example_4_lines.png)
