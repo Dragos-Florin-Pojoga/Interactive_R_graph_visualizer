@@ -1,14 +1,17 @@
 # Interactive R graph visualizer
 
-![](./assets/example_4.png)
+For the romanian writeup see: [RO](https://github.com/Dragos-Florin-Pojoga/Interactive_R_graph_visualizer/tree/Proiect_PS)
+
+![](./assets/example_4_points.png)
 
 # Features
 * Support for full R environment
 * Real-Time Graph Plotter
-    * as many lines on a single graph as you want
-    * 6 predefined line colors and many randomly generated ones
+    * line or point plots
+    * plot many lines on a single graph
+    * dynamic or 1:1 graph scaling
     * Color legend
-    * dynamic graph scaling
+    * 6 predefined line colors and many randomly generated ones for each line plot
 * custom R functions
     * INPUT:
         * slider(min, max, [step], [default])
@@ -17,7 +20,7 @@
         * plot_line(xs, ys, [name])
         * plot_func(func, xs, [name])
 * code editor
-* dynamic sliders based on the code
+* dynamic sliders based on the R code
 * logging window
 * examples carousel
 
@@ -28,4 +31,9 @@
 
 
 # Gallery
+
 ![](./assets/reddit.png)
+
+![](./assets/example_4_points.png)
+
+![](./assets/example_4_lines.png)

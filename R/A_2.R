@@ -1,4 +1,4 @@
-mu <- slider(-5, 5, 1, -2)
+mu <- slider(-5, 5, 0.1, -2)
 sigma <- slider(0.1, 5, 0.1, 1.4)
 n <- slider(1, 10, 1, 3)
 

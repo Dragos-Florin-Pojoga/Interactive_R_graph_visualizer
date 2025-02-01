@@ -15,9 +15,14 @@ class Widget(QWidget):
         self.colors = [QColor(0, 0, 255), QColor(255, 0, 0), QColor(0, 255, 0), QColor(255, 165, 0), QColor(128, 0, 128), QColor(0, 255, 255)]
         self.current_color_index = 0
         self.one_to_one_scaling = False
+        self.draw_points = False
 
     def toggle_scaling(self):
         self.one_to_one_scaling = not self.one_to_one_scaling
+        self.update()
+
+    def toggle_points(self):
+        self.draw_points = not self.draw_points
         self.update()
 
 
@@ -97,8 +102,13 @@ class Widget(QWidget):
             path = [QPointF(center_x + x * x_scale, center_y - y * y_scale) 
                    for x, y in points]
             
-            for i in range(1, len(path)):
-                painter.drawLine(path[i-1], path[i])
+            if self.draw_points:
+                for point in path:
+                    painter.drawPoint(point)
+            else:
+                for i in range(1, len(path)):
+                    painter.drawLine(path[i-1], path[i])
+            
 
 
 

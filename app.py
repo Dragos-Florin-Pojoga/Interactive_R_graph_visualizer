@@ -52,6 +52,9 @@ class MainWindow(QMainWindow):
         top_left_layout = QHBoxLayout(top_left_widget)
         left_layout.addWidget(top_left_widget, stretch=1)
 
+        bottom_left_buttons_widget = QWidget()
+        bottom_left_buttons_layout = QHBoxLayout(bottom_left_buttons_widget)
+
         # Right panel with scroll
         right_widget = QWidget()
         right_widget.setMinimumWidth(300)
@@ -97,7 +100,13 @@ class MainWindow(QMainWindow):
 
         scale_button = QPushButton("Toggle 1:1 scaling")
         scale_button.clicked.connect(self.graph_widget.toggle_scaling)
-        left_layout.addWidget(scale_button)
+        bottom_left_buttons_layout.addWidget(scale_button)
+
+        plot_type_button = QPushButton("Toggle line / points plot")
+        plot_type_button.clicked.connect(self.graph_widget.toggle_points)
+        bottom_left_buttons_layout.addWidget(plot_type_button)
+
+        left_layout.addWidget(bottom_left_buttons_widget)
 
 
 
