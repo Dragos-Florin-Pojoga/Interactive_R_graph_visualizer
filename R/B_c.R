@@ -8,4 +8,5 @@ ex2 <- sum(x^2 * k * r_x)
 var <- ex2 - mean^2
 
 plot_line(x[1:20], k * r_x[1:20], "c)")
-cat("Media:", mean, "Varianța:", var)
+cat("Media:", mean, "\n")
+cat("Varianța:", var, "\n")

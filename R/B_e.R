@@ -10,4 +10,5 @@ var <- ex2 - mean^2
 
 xs <- seq(0, 10, length.out = 100)
 plot_func(function(x) k * integrand(x), xs, "e)")
-cat("Media:", mean, "Varianța:", var)
+cat("Media:", mean, "\n")
+cat("Varianța:", var, "\n")

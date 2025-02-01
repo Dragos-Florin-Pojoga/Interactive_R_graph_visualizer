@@ -1,5 +1,5 @@
-a <- slider(-10, 10, 1, 0)
-b <- slider(-10, 10, 1, 0)
+a <- slider(-10, 10, 0.1, 0)
+b <- slider(-10, 10, 0.1, 0)
 # Normalization
 Z <- integrate(function(x) a*x + b*x^2, 0, 1)$value
 k <- 1 / Z
@@ -10,4 +10,5 @@ var <- ex2 - mean^2
 
 xs <- seq(0, 1, length.out = 100)
 plot_func(function(x) k * (a*x + b*x^2), xs, "b)")
-cat("Media:", mean, "Varianța:", var)
+cat("Media:", mean, "\n")
+cat("Varianța:", var, "\n")
