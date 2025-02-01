@@ -1,1 +1,3 @@
 __pycache__/
+R/Shiny/*
+!R/Shiny/.gitkeep
