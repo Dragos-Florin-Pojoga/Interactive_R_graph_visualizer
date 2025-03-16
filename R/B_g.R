@@ -9,8 +9,9 @@ var_result <- tryCatch({
     ex2 - if(is.numeric(mean_result)) mean_result^2 else NA
 }, error = function(e) "divergentă")
 
+f <- function(x) 1/(pi*(1+x^2))
 
-plot_func(function(x) 1/(pi*(1+x^2)), xs, "g)")
+plot_func(f, xs, "g)")
 
 cat("Media:", if(is.numeric(mean_result)) mean_result else "nedefinită (integrală divergentă)",
     "\nVarianța:", if(is.numeric(var_result)) var_result else "nedefinită (integrală divergentă)")

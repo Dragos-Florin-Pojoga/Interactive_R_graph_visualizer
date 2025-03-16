@@ -7,7 +7,7 @@ f <- function(x) {
 
 xs <- seq(x_min, x_max, length.out = 1000)
 
-plot_func(f, xs, name = "f(x)")
+plot_func(f, xs, "f(x)")
 
 mu <- integrate(function(x) x * f(x), -Inf, Inf)$value
 ex2 <- integrate(function(x) x^2 * f(x), -Inf, Inf)$value
